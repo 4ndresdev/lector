@@ -15,187 +15,187 @@ import { NavigationContainer, useNavigation } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import * as SQLite from "expo-sqlite";
-import * as Network from 'expo-network';
+import * as Network from "expo-network";
 import axios from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const db = SQLite.openDatabase("acreditaciones.db");
 
 const Home = ({ navigation }) => {
-
   const [text, setText] = useState("");
   const [alerta, setAlerta] = useState(false);
-  const [updated, setUpdated] = useState(true);
+  const [updated, setUpdated] = useState(false);
   const [conected, setConected] = useState(false);
 
-
   useEffect(() => {
-
     const conexion = async () => {
       const conexion = await Network.getNetworkStateAsync();
-      if (conexion.isInternetReachable) {
+      if (conexion.isInternetReachable && conexion.isConnected) {
         setConected(true);
       } else {
         setConected(false);
       }
-    }
+    };
+
+    const fecha = async () => {
+      if ((await AsyncStorage.getItem("fecha")) == null) {
+        setUpdated(false);
+      } else {
+        setUpdated(true);
+      }
+    };
 
     conexion();
-
-  })
-
+    fecha();
+  });
 
   const update = async () => {
-
     setAlerta(true);
 
     if (conected) {
-
       try {
-
         //Creamos la tabla si no existe
         db.transaction(tx => {
           tx.executeSql(
             "CREATE TABLE IF NOT EXISTS solicitudes (nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)"
           );
         });
-        
 
         //Obtenemos la información
-        let response = await fetch(
-          "https://70691434590f.ngrok.io/api/acreditaciones/get_all"
+        const response = await axios.post(
+          "https://c9f0a190025e.ngrok.io/api/acreditaciones/get_all",
+          {
+            fecha: await AsyncStorage.getItem("fecha")
+          }
         );
 
-        //Convertimos en json
-        let obj = await response.json();
+        let now = "";
 
-        //Recorremos el json
-        
-        await obj.forEach(element => {
-
-
-
-          if (element.nuevo == 1) {
-            
-            db.transaction(tx => {
-              tx.executeSql(
-                "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa, element.vigencia, element.folio_expediente, element.estatus, element.descripcion],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
+        if (Object.keys(response.data).length > 0) {
+          //Recorremos el json
+          await response.data.forEach(element => {
+            if (element.nuevo == 1) {
+              db.transaction(tx => {
+                tx.executeSql(
+                  "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
+                  [
+                    element.nombre,
+                    element.placa,
+                    element.vigencia,
+                    element.folio_expediente,
+                    element.estatus,
+                    element.descripcion
+                  ],
+                  (tx, results) => {
+                    /*
+                  if (results.rowsAffected == 0) {
+                    ToastAndroid.show(
+                      `Error al descargar el registro ${element.id_acreditacion}`,
+                      ToastAndroid.SHORT
+                    );
                   }
-                }
-              );
-            });
-            
-
-            if (element.placa2 != null) {
-
-              
-            db.transaction(tx => {
-              tx.executeSql(
-                "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa2, element.vigencia, element.folio_expediente, element.estatus, element.descripcion],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
+                  */
                   }
-                }
-              );
-            });
-            
+                );
+              });
 
+              if (element.placa2 != null) {
+                db.transaction(tx => {
+                  tx.executeSql(
+                    "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
+                    [
+                      element.nombre,
+                      element.placa2,
+                      element.vigencia,
+                      element.folio_expediente,
+                      element.estatus,
+                      element.descripcion
+                    ],
+                    (tx, results) => {}
+                  );
+                });
+              }
+
+              if (element.placa3 != null) {
+                db.transaction(tx => {
+                  tx.executeSql(
+                    "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
+                    [
+                      element.nombre,
+                      element.placa3,
+                      element.vigencia,
+                      element.folio_expediente,
+                      element.estatus,
+                      element.descripcion
+                    ],
+                    (tx, results) => {}
+                  );
+                });
+              }
+            } else if (element.nuevo == 2) {
+              db.transaction(tx => {
+                tx.executeSql(
+                  "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
+                  [
+                    element.nombre,
+                    element.placa,
+                    element.vigencia,
+                    element.folio_expediente,
+                    element.estatus,
+                    element.descripcion,
+                    element.placa
+                  ],
+                  (tx, results) => {}
+                );
+              });
+
+              if (element.placa2 != null) {
+                db.transaction(tx => {
+                  tx.executeSql(
+                    "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa2 = ?) values (?, ?, ?, ?, ?, ?, ?)",
+                    [
+                      element.nombre,
+                      element.placa2,
+                      element.vigencia,
+                      element.folio_expediente,
+                      element.estatus,
+                      element.descripcion,
+                      element.placa2
+                    ],
+                    (tx, results) => {}
+                  );
+                });
+              }
+
+              if (element.placa3 != null) {
+                db.transaction(tx => {
+                  tx.executeSql(
+                    "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa3 = ?) values (?, ?, ?, ?, ?, ?, ?)",
+                    [
+                      element.nombre,
+                      element.placa3,
+                      element.vigencia,
+                      element.folio_expediente,
+                      element.estatus,
+                      element.descripcion,
+                      element.placa3
+                    ],
+                    (tx, results) => {}
+                  );
+                });
+              }
             }
 
-            if (element.placa3 != null) {
-
-              
-            db.transaction(tx => {
-              tx.executeSql(
-                "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa3, element.vigencia, element.folio_expediente, element.estatus, element.descripcion],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
-                  }
-                }
-              );
-            });
-            
-
-            }
-          } else if(element.nuevo == 2){
-
-            
-            db.transaction(tx => {
-              tx.executeSql(
-                "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa, element.vigencia, element.folio_expediente, element.estatus, element.descripcion, element.placa],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
-                  }
-                }
-              );
-            });
-          
-
-            if (element.placa2 != null) {
-
-              
-            db.transaction(tx => {
-              tx.executeSql(
-                "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa2 = ?) values (?, ?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa2, element.vigencia, element.folio_expediente, element.estatus, element.descripcion, element.placa2],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
-                  }
-                }
-              );
-            });
-            
-
-            }
-
-            if (element.placa3 != null) {
-
-              
-            db.transaction(tx => {
-              tx.executeSql(
-                "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa3 = ?) values (?, ?, ?, ?, ?, ?, ?)",
-                [element.nombre, element.placa3, element.vigencia, element.folio_expediente, element.estatus, element.descripcion, element.placa3],
-                (tx, results) => {
-                  if(results.rowsAffected == 0){
-                    ToastAndroid.show(`Error al descargar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
-                  }
-                }
-              );
-            });
-            
-
-            }
-
-          }
-
-
-          axios.post('https://70691434590f.ngrok.io/api/acreditaciones/change', {
-            id_acreditacion: element.id_acreditacion
-          }).then(function (result) {
-            //console.log(result.data);
-          }).catch(function (error) {
-            ToastAndroid.show(`Error al actualizar el registro ${element.id_acreditacion}`, ToastAndroid.SHORT);
+            now = element.fecha_registro;
           });
 
-        });
-
-
-
-        //Quitamos la alerta
-        setAlerta(false);
-        setUpdated(true);
-
+          //Quitamos la alerta
+          setAlerta(false);
+          AsyncStorage.setItem("fecha", now);
+        } else {
+          ToastAndroid.show("Nada para actualizar", ToastAndroid.SHORT);
+          setAlerta(false);
+        }
       } catch (error) {
         console.error(error);
         setAlerta(false);
@@ -203,33 +203,28 @@ const Home = ({ navigation }) => {
     } else {
       ToastAndroid.show("Sin conexion a internet", ToastAndroid.SHORT);
     }
+  };
 
-  }
-
-
-  const get_data = () => {
-
-    //update();
-    alert('hola');
+  const get_data = async () => {
+    update();
 
     db.transaction(tx => {
-      tx.executeSql(
-        "select * from solicitudes limit 1",
-        [],
-        (tx, results) => {
-          console.log(results.rows);
-        }
-      );
+      tx.executeSql("select count(*) from solicitudes", [], (tx, results) => {
+        console.log(results.rows._array);
+        alerta(results.rows._array);
+      });
     });
-
-  }
-
+  };
 
   return (
     <View style={styles.container}>
-      { updated ?
+      {updated ? (
         <View
-          style={{ width: "90%", flexDirection: "row", justifyContent: "center" }}
+          style={{
+            width: "90%",
+            flexDirection: "row",
+            justifyContent: "center"
+          }}
         >
           <TextInput
             autoCapitalize={"characters"}
@@ -246,23 +241,26 @@ const Home = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-        :
+      ) : (
         <View style={styles.updatedContainer}>
           <Image
-            source={require('./assets/codigo.png')}
+            source={require("./assets/codigo.png")}
             style={{ width: 200, height: 200 }}
           />
-          <Text style={{ textAlign: 'center', marginTop: 30 }}> Antes de continuar, es importante {"\n"} descargar la base </Text>
+          <Text style={{ textAlign: "center", marginTop: 30 }}>
+            {" "}
+            Antes de continuar, es importante {"\n"} descargar la base{" "}
+          </Text>
           <Button
             onPress={update}
             title="Descargar base"
             loading={alerta ? true : null}
             disabled={alerta ? true : null}
             containerStyle={{ marginTop: 20 }}
-            buttonStyle={{ backgroundColor: '#000000', padding: 15 }}
+            buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
           />
         </View>
-      }
+      )}
       {text.length > 0 ? (
         <View style={{ width: "67%" }}>
           <TouchableOpacity onPress={get_data} style={styles.lgBtn}>
@@ -410,7 +408,7 @@ const styles = StyleSheet.create({
   },
   updatedContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
+    justifyContent: "center",
+    alignItems: "center"
   }
 });
