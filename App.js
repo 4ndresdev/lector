@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  ToastAndroid
+  ToastAndroid,
+  Alert
 } from "react-native";
 import { Icon, Image, Button } from "react-native-elements";
 import { NavigationContainer, useNavigation } from "@react-navigation/native";
@@ -24,7 +25,7 @@ const db = SQLite.openDatabase("acreditaciones.db");
 const Home = ({ navigation }) => {
   const [text, setText] = useState("");
   const [alerta, setAlerta] = useState(false);
-  const [updated, setUpdated] = useState(false);
+  const [updated, setUpdated] = useState(true);
   const [conected, setConected] = useState(false);
 
   useEffect(() => {
@@ -47,37 +48,53 @@ const Home = ({ navigation }) => {
 
     conexion();
     fecha();
+
   });
 
   const update = async () => {
-    setAlerta(true);
+
+    //setAlerta(true);
 
     if (conected) {
       try {
-        //Creamos la tabla si no existe
+
+
+        /*
         db.transaction(tx => {
-          tx.executeSql(
-            "CREATE TABLE IF NOT EXISTS solicitudes (nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)"
-          );
-        });
+          tx.executeSql('CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)',
+            null,
+            (tx, results) => {
+            })
+        })
+        */
+
 
         //Obtenemos la información
-        const response = await axios.post(
-          "https://c9f0a190025e.ngrok.io/api/acreditaciones/get_all",
-          {
-            fecha: await AsyncStorage.getItem("fecha")
+        const response = await axios({
+          method: 'post',
+          url: 'https://e32b10924064.ngrok.io/api/acreditaciones/get_all',
+          data: {
+            fecha: (await AsyncStorage.getItem("fecha") == null ? '' : await AsyncStorage.getItem("fecha"))
+          },
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-transform',
+            'Cache-Control': 'no-store'
           }
-        );
+        })
 
-        let now = "";
+        let now = '';
 
+        console.log(response.data);
+
+        /*
         if (Object.keys(response.data).length > 0) {
           //Recorremos el json
           await response.data.forEach(element => {
             if (element.nuevo == 1) {
-              db.transaction(tx => {
+              db.transaction((tx) => {
                 tx.executeSql(
-                  "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
+                  "INSERT INTO items(nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
                   [
                     element.nombre,
                     element.placa,
@@ -87,55 +104,15 @@ const Home = ({ navigation }) => {
                     element.descripcion
                   ],
                   (tx, results) => {
-                    /*
-                  if (results.rowsAffected == 0) {
-                    ToastAndroid.show(
-                      `Error al descargar el registro ${element.id_acreditacion}`,
-                      ToastAndroid.SHORT
-                    );
-                  }
-                  */
+                    console.log('Insert placa 1: ' + results.rowsAffected);
                   }
                 );
               });
 
-              if (element.placa2 != null) {
-                db.transaction(tx => {
-                  tx.executeSql(
-                    "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
-                    [
-                      element.nombre,
-                      element.placa2,
-                      element.vigencia,
-                      element.folio_expediente,
-                      element.estatus,
-                      element.descripcion
-                    ],
-                    (tx, results) => {}
-                  );
-                });
-              }
-
-              if (element.placa3 != null) {
-                db.transaction(tx => {
-                  tx.executeSql(
-                    "INSERT INTO solicitudes (nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
-                    [
-                      element.nombre,
-                      element.placa3,
-                      element.vigencia,
-                      element.folio_expediente,
-                      element.estatus,
-                      element.descripcion
-                    ],
-                    (tx, results) => {}
-                  );
-                });
-              }
             } else if (element.nuevo == 2) {
-              db.transaction(tx => {
+              db.transaction((tx) => {
                 tx.executeSql(
-                  "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
+                  "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
                   [
                     element.nombre,
                     element.placa,
@@ -145,45 +122,9 @@ const Home = ({ navigation }) => {
                     element.descripcion,
                     element.placa
                   ],
-                  (tx, results) => {}
+                  (tx, results) => { }
                 );
               });
-
-              if (element.placa2 != null) {
-                db.transaction(tx => {
-                  tx.executeSql(
-                    "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa2 = ?) values (?, ?, ?, ?, ?, ?, ?)",
-                    [
-                      element.nombre,
-                      element.placa2,
-                      element.vigencia,
-                      element.folio_expediente,
-                      element.estatus,
-                      element.descripcion,
-                      element.placa2
-                    ],
-                    (tx, results) => {}
-                  );
-                });
-              }
-
-              if (element.placa3 != null) {
-                db.transaction(tx => {
-                  tx.executeSql(
-                    "UPDATE solicitudes set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa3 = ?) values (?, ?, ?, ?, ?, ?, ?)",
-                    [
-                      element.nombre,
-                      element.placa3,
-                      element.vigencia,
-                      element.folio_expediente,
-                      element.estatus,
-                      element.descripcion,
-                      element.placa3
-                    ],
-                    (tx, results) => {}
-                  );
-                });
-              }
             }
 
             now = element.fecha_registro;
@@ -192,10 +133,12 @@ const Home = ({ navigation }) => {
           //Quitamos la alerta
           setAlerta(false);
           AsyncStorage.setItem("fecha", now);
+          ToastAndroid.show("Datos actualizados correctamente", ToastAndroid.SHORT);
         } else {
-          ToastAndroid.show("Nada para actualizar", ToastAndroid.SHORT);
           setAlerta(false);
         }
+        */
+
       } catch (error) {
         console.error(error);
         setAlerta(false);
@@ -206,14 +149,8 @@ const Home = ({ navigation }) => {
   };
 
   const get_data = async () => {
-    update();
+    //update();
 
-    db.transaction(tx => {
-      tx.executeSql("select count(*) from solicitudes", [], (tx, results) => {
-        console.log(results.rows._array);
-        alerta(results.rows._array);
-      });
-    });
   };
 
   return (
@@ -242,25 +179,25 @@ const Home = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.updatedContainer}>
-          <Image
-            source={require("./assets/codigo.png")}
-            style={{ width: 200, height: 200 }}
-          />
-          <Text style={{ textAlign: "center", marginTop: 30 }}>
-            {" "}
+          <View style={styles.updatedContainer}>
+            <Image
+              source={require("./assets/codigo.png")}
+              style={{ width: 200, height: 200 }}
+            />
+            <Text style={{ textAlign: "center", marginTop: 30 }}>
+              {" "}
             Antes de continuar, es importante {"\n"} descargar la base{" "}
-          </Text>
-          <Button
-            onPress={update}
-            title="Descargar base"
-            loading={alerta ? true : null}
-            disabled={alerta ? true : null}
-            containerStyle={{ marginTop: 20 }}
-            buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
-          />
-        </View>
-      )}
+            </Text>
+            <Button
+              onPress={update}
+              title="Descargar base"
+              loading={alerta ? true : null}
+              disabled={alerta ? true : null}
+              containerStyle={{ marginTop: 20 }}
+              buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
+            />
+          </View>
+        )}
       {text.length > 0 ? (
         <View style={{ width: "67%" }}>
           <TouchableOpacity onPress={get_data} style={styles.lgBtn}>
