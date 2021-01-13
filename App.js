@@ -48,51 +48,60 @@ const Home = ({ navigation }) => {
 
     conexion();
     fecha();
-
   });
 
   const update = async () => {
-
-    //setAlerta(true);
+    setAlerta(true);
 
     if (conected) {
       try {
+        if ((await AsyncStorage.getItem("fecha")) == null) {
+          /**
+           * Si por alguna razon se borra la variable fecha, restablecemos todo los
+           * datos
+           */
 
+          db.transaction(tx => {
+            tx.executeSql("drop table items", [], (tx, results) => {
+              Alert.alert("table delected");
+            });
+          });
 
-        /*
-        db.transaction(tx => {
-          tx.executeSql('CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)',
-            null,
-            (tx, results) => {
-            })
-        })
-        */
-
+          db.transaction(tx => {
+            tx.executeSql(
+              "CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)",
+              null,
+              (tx, results) => {
+                Alert.alert("table created");
+              }
+            );
+          });
+        }
 
         //Obtenemos la información
         const response = await axios({
-          method: 'post',
-          url: 'https://e32b10924064.ngrok.io/api/acreditaciones/get_all',
+          method: "post",
+          url: "https://e82016a987f9.ngrok.io/api/acreditaciones/get_all",
           data: {
-            fecha: (await AsyncStorage.getItem("fecha") == null ? '' : await AsyncStorage.getItem("fecha"))
+            fecha:
+              (await AsyncStorage.getItem("fecha")) == null
+                ? ""
+                : await AsyncStorage.getItem("fecha")
           },
           headers: {
-            'Cache-Control': 'no-cache',
-            'Cache-Control': 'no-transform',
-            'Cache-Control': 'no-store'
+            "Cache-Control": "no-cache",
+            "Cache-Control": "no-transform",
+            "Cache-Control": "no-store"
           }
-        })
+        });
 
-        let now = '';
+        let now = "";
 
-        console.log(response.data);
-
-        /*
         if (Object.keys(response.data).length > 0) {
           //Recorremos el json
           await response.data.forEach(element => {
             if (element.nuevo == 1) {
-              db.transaction((tx) => {
+              db.transaction(tx => {
                 tx.executeSql(
                   "INSERT INTO items(nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
                   [
@@ -104,13 +113,12 @@ const Home = ({ navigation }) => {
                     element.descripcion
                   ],
                   (tx, results) => {
-                    console.log('Insert placa 1: ' + results.rowsAffected);
+                    console.log("Insert placa 1: " + results.rowsAffected);
                   }
                 );
               });
-
             } else if (element.nuevo == 2) {
-              db.transaction((tx) => {
+              db.transaction(tx => {
                 tx.executeSql(
                   "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
                   [
@@ -122,7 +130,7 @@ const Home = ({ navigation }) => {
                     element.descripcion,
                     element.placa
                   ],
-                  (tx, results) => { }
+                  (tx, results) => {}
                 );
               });
             }
@@ -133,24 +141,53 @@ const Home = ({ navigation }) => {
           //Quitamos la alerta
           setAlerta(false);
           AsyncStorage.setItem("fecha", now);
-          ToastAndroid.show("Datos actualizados correctamente", ToastAndroid.SHORT);
+          ToastAndroid.show(
+            "Datos sincronizados correctamente",
+            ToastAndroid.SHORT
+          );
         } else {
           setAlerta(false);
+          ToastAndroid.show("Sin datos para sincronizar", ToastAndroid.SHORT);
         }
-        */
-
       } catch (error) {
         console.error(error);
         setAlerta(false);
       }
     } else {
-      ToastAndroid.show("Sin conexion a internet", ToastAndroid.SHORT);
+      ToastAndroid.show("Sin conexión a internet", ToastAndroid.SHORT);
     }
   };
 
   const get_data = async () => {
-    //update();
+    update();
 
+    db.transaction(tx => {
+      tx.executeSql(
+        "select * from items where placa = ?",
+        [text],
+        (tx, results) => {
+          if (results.rows._array.length > 0) {
+            var datos = {
+              nombre: results.rows.item(0).nombre,
+              vigencia: results.rows.item(0).vigencia,
+              folio: results.rows.item(0).folio_expediente,
+              estatus: results.rows.item(0).estatus,
+              placa: results.rows.item(0).placa,
+              descripcion: results.rows.item(0).descripcion
+            };
+
+            navigation.navigate("Detail", {
+              data: datos
+            });
+          } else {
+            ToastAndroid.show(
+              "No se encontraron resultados",
+              ToastAndroid.SHORT
+            );
+          }
+        }
+      );
+    });
   };
 
   return (
@@ -179,25 +216,25 @@ const Home = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       ) : (
-          <View style={styles.updatedContainer}>
-            <Image
-              source={require("./assets/codigo.png")}
-              style={{ width: 200, height: 200 }}
-            />
-            <Text style={{ textAlign: "center", marginTop: 30 }}>
-              {" "}
+        <View style={styles.updatedContainer}>
+          <Image
+            source={require("./assets/codigo.png")}
+            style={{ width: 200, height: 200 }}
+          />
+          <Text style={{ textAlign: "center", marginTop: 30 }}>
+            {" "}
             Antes de continuar, es importante {"\n"} descargar la base{" "}
-            </Text>
-            <Button
-              onPress={update}
-              title="Descargar base"
-              loading={alerta ? true : null}
-              disabled={alerta ? true : null}
-              containerStyle={{ marginTop: 20 }}
-              buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
-            />
-          </View>
-        )}
+          </Text>
+          <Button
+            onPress={update}
+            title="Descargar base"
+            loading={alerta ? true : null}
+            disabled={alerta ? true : null}
+            containerStyle={{ marginTop: 20 }}
+            buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
+          />
+        </View>
+      )}
       {text.length > 0 ? (
         <View style={{ width: "67%" }}>
           <TouchableOpacity onPress={get_data} style={styles.lgBtn}>
@@ -233,16 +270,31 @@ const Camera = () => {
 
     db.transaction(tx => {
       tx.executeSql(
-        "select * from prueba where id = ?",
+        "select * from items where placa = ?",
         [data],
         (tx, results) => {
-          console.log(results.rows._array);
+          if (results.rows._array.length > 0) {
+            var datos = {
+              nombre: results.rows.item(0).nombre,
+              vigencia: results.rows.item(0).vigencia,
+              folio: results.rows.item(0).folio_expediente,
+              estatus: results.rows.item(0).estatus,
+              placa: results.rows.item(0).placa,
+              descripcion: results.rows.item(0).descripcion
+            };
+
+            navigation.navigate("Detail", {
+              data: datos
+            });
+          } else {
+            ToastAndroid.show(
+              "No se encontraron resultados",
+              ToastAndroid.SHORT
+            );
+            navigation.navigate("Reader");
+          }
         }
       );
-    });
-
-    navigation.navigate("Detail", {
-      codigo: data
     });
   };
 
@@ -277,11 +329,20 @@ const Camera = () => {
 };
 
 const Detail = ({ route }) => {
-  const { codigo } = route.params;
+  const {
+    nombre,
+    vigencia,
+    folio,
+    estatus,
+    placa,
+    descripcion
+  } = route.params.data;
+
+  console.log(route.params);
 
   return (
     <View>
-      <Text>{codigo}</Text>
+      <Text>{nombre}</Text>
     </View>
   );
 };
