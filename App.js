@@ -11,7 +11,7 @@ import {
   ToastAndroid,
   Alert
 } from "react-native";
-import { Icon, Image, Button } from "react-native-elements";
+import { Icon, Image, Button, Badge } from "react-native-elements";
 import { NavigationContainer, useNavigation } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { BarCodeScanner } from "expo-barcode-scanner";
@@ -63,16 +63,16 @@ const Home = ({ navigation }) => {
 
           db.transaction(tx => {
             tx.executeSql("drop table items", [], (tx, results) => {
-              Alert.alert("table delected");
+              //Alert.alert("table delected");
             });
           });
 
           db.transaction(tx => {
             tx.executeSql(
-              "CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, estatus TEXT, descripcion TEXT)",
+              "CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, descripcion TEXT)",
               null,
               (tx, results) => {
-                Alert.alert("table created");
+                //Alert.alert("table created");
               }
             );
           });
@@ -81,7 +81,7 @@ const Home = ({ navigation }) => {
         //Obtenemos la información
         const response = await axios({
           method: "post",
-          url: "https://e82016a987f9.ngrok.io/api/acreditaciones/get_all",
+          url: "https://f33fb6d86fb3.ngrok.io/api/acreditaciones/get_all",
           data: {
             fecha:
               (await AsyncStorage.getItem("fecha")) == null
@@ -93,6 +93,9 @@ const Home = ({ navigation }) => {
             "Cache-Control": "no-transform",
             "Cache-Control": "no-store"
           }
+        }).catch(function (error) {
+          ToastAndroid.show("Ocurrió un problema al obtener los datos", ToastAndroid.SHORT);
+          return;
         });
 
         let now = "";
@@ -101,15 +104,15 @@ const Home = ({ navigation }) => {
           //Recorremos el json
           await response.data.forEach(element => {
             if (element.nuevo == 1) {
+
               db.transaction(tx => {
                 tx.executeSql(
-                  "INSERT INTO items(nombre, placa, vigencia, folio_expediente, estatus, descripcion) values (?, ?, ?, ?, ?, ?)",
+                  "INSERT INTO items(nombre, placa, vigencia, folio_expediente, descripcion) values (?, ?, ?, ?, ?)",
                   [
                     element.nombre,
                     element.placa,
                     element.vigencia,
                     element.folio_expediente,
-                    element.estatus,
                     element.descripcion
                   ],
                   (tx, results) => {
@@ -120,17 +123,16 @@ const Home = ({ navigation }) => {
             } else if (element.nuevo == 2) {
               db.transaction(tx => {
                 tx.executeSql(
-                  "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, estatus = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?, ?)",
+                  "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?)",
                   [
                     element.nombre,
                     element.placa,
                     element.vigencia,
                     element.folio_expediente,
-                    element.estatus,
                     element.descripcion,
                     element.placa
                   ],
-                  (tx, results) => {}
+                  (tx, results) => { }
                 );
               });
             }
@@ -155,11 +157,13 @@ const Home = ({ navigation }) => {
       }
     } else {
       ToastAndroid.show("Sin conexión a internet", ToastAndroid.SHORT);
+      setAlerta(false);
     }
   };
 
   const get_data = async () => {
     update();
+
 
     db.transaction(tx => {
       tx.executeSql(
@@ -188,6 +192,7 @@ const Home = ({ navigation }) => {
         }
       );
     });
+
   };
 
   return (
@@ -216,25 +221,25 @@ const Home = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.updatedContainer}>
-          <Image
-            source={require("./assets/codigo.png")}
-            style={{ width: 200, height: 200 }}
-          />
-          <Text style={{ textAlign: "center", marginTop: 30 }}>
-            {" "}
+          <View style={styles.updatedContainer}>
+            <Image
+              source={require("./assets/codigo.png")}
+              style={{ width: 200, height: 200 }}
+            />
+            <Text style={{ textAlign: "center", marginTop: 30 }}>
+              {" "}
             Antes de continuar, es importante {"\n"} descargar la base{" "}
-          </Text>
-          <Button
-            onPress={update}
-            title="Descargar base"
-            loading={alerta ? true : null}
-            disabled={alerta ? true : null}
-            containerStyle={{ marginTop: 20 }}
-            buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
-          />
-        </View>
-      )}
+            </Text>
+            <Button
+              onPress={update}
+              title="Descargar base"
+              loading={alerta ? true : null}
+              disabled={alerta ? true : null}
+              containerStyle={{ marginTop: 20 }}
+              buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
+            />
+          </View>
+        )}
       {text.length > 0 ? (
         <View style={{ width: "67%" }}>
           <TouchableOpacity onPress={get_data} style={styles.lgBtn}>
@@ -253,6 +258,7 @@ const Home = ({ navigation }) => {
 };
 
 const Camera = () => {
+
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(true);
 
@@ -341,8 +347,52 @@ const Detail = ({ route }) => {
   console.log(route.params);
 
   return (
-    <View>
-      <Text>{nombre}</Text>
+    <View style={styles.detailContainer}>
+      <View style={styles.placa}>
+        <View style={styles.negro}>
+          <View style={styles.blanco}>
+            <View style={styles.cuadrolLeftTop}></View>
+            <View style={styles.cuadrolRightTop}></View>
+            <View style={styles.cuadrolRightBottom}></View>
+            <View style={styles.cuadrolLeftBottom}></View>
+            <Text style={styles.txtplaca}>{placa}</Text>
+          </View>
+        </View>
+      </View>
+      <View style={{ width: '80%', marginTop: 20 }}>
+        <Text style={{ fontSize: 20, textAlign: 'center' }}>{nombre}</Text>
+      </View>
+      <View style={{ width: '80%', marginTop: 10 }}>
+        <Badge value={estatus} status="success" />
+      </View>
+      <View style={{ marginTop: 30 }}></View>
+      <View style={{ width: '90%' }}>
+        <View style={styles.carta}>
+          <Icon
+            name='folder'
+            type='font-awesome'
+          />
+          <Text style={{ marginLeft: 10 }}>Folio: {folio}</Text>
+        </View>
+      </View>
+      <View style={{ width: '90%', marginTop: 15 }}>
+        <View style={styles.carta}>
+          <Icon
+            name='address-card'
+            type='font-awesome'
+          />
+          <Text style={{ marginLeft: 10 }}>{descripcion}</Text>
+        </View>
+      </View>
+      <View style={{ width: '90%', marginTop: 15 }}>
+        <View style={styles.carta}>
+          <Icon
+            name='hourglass-end'
+            type='font-awesome'
+          />
+          <Text style={{ marginLeft: 10 }}>Vigencia: {vigencia}</Text>
+        </View>
+      </View>
     </View>
   );
 };
@@ -408,5 +458,81 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center"
+  },
+  detailContainer: {
+    flex: 1,
+    padding: 30,
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  placa: {
+    width: '80%',
+    height: 150,
+    backgroundColor: '#f6c065',
+    marginTop: 30,
+    padding: 15,
+    borderRadius: 5
+  },
+  negro: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+    padding: 15
+  },
+  blanco: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  cuadrolLeftTop: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#000000',
+    margin: 10,
+    position: 'absolute',
+    left: 0,
+    top: 0
+  },
+  cuadrolRightTop: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#000000',
+    margin: 10,
+    position: 'absolute',
+    right: 0,
+    top: 0
+  },
+  cuadrolRightBottom: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#000000',
+    margin: 10,
+    position: 'absolute',
+    right: 0,
+    bottom: 0
+  },
+  cuadrolLeftBottom: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#000000',
+    margin: 10,
+    position: 'absolute',
+    left: 0,
+    bottom: 0
+  },
+  txtplaca: {
+    fontSize: 25,
+    fontWeight: 'bold'
+  },
+  carta: {
+    width: '100%',
+    padding: 15,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    borderColor: '#e8e8e8',
+    borderWidth: 1
   }
 });
