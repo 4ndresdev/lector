@@ -9,7 +9,9 @@ import {
   TextInput,
   Dimensions,
   ToastAndroid,
-  Alert
+  Alert,
+  SafeAreaView,
+  ScrollView
 } from "react-native";
 import { Icon, Image, Button, Badge } from "react-native-elements";
 import { NavigationContainer, useNavigation } from "@react-navigation/native";
@@ -19,6 +21,9 @@ import * as SQLite from "expo-sqlite";
 import * as Network from "expo-network";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import moment from "moment";
+import "moment/min/locales";
+moment.locale("es");
 
 const db = SQLite.openDatabase("acreditaciones.db");
 
@@ -79,9 +84,9 @@ const Home = ({ navigation }) => {
         }
 
         //Obtenemos la información
-        const response = await axios({
+        await axios({
           method: "post",
-          url: "https://f33fb6d86fb3.ngrok.io/api/acreditaciones/get_all",
+          url: "https://7819c4cbb689.ngrok.io/api/acreditaciones/get_all",
           data: {
             fecha:
               (await AsyncStorage.getItem("fecha")) == null
@@ -93,64 +98,74 @@ const Home = ({ navigation }) => {
             "Cache-Control": "no-transform",
             "Cache-Control": "no-store"
           }
-        }).catch(function (error) {
-          ToastAndroid.show("Ocurrió un problema al obtener los datos", ToastAndroid.SHORT);
-          return;
-        });
+        })
+          .catch(function(error) {
+            ToastAndroid.show(
+              "Ocurrió un problema al obtener los datos",
+              ToastAndroid.SHORT
+            );
+            return;
+          })
+          .then(async function(response) {
+            let now = "";
 
-        let now = "";
+            if (Object.keys(response.data).length > 0) {              
 
-        if (Object.keys(response.data).length > 0) {
-          //Recorremos el json
-          await response.data.forEach(element => {
-            if (element.nuevo == 1) {
+              //Recorremos el json
+              response.data.forEach(element => {
+                if (element.nuevo == 1) {
+                  db.transaction(tx => {
+                    tx.executeSql(
+                      "INSERT INTO items(nombre, placa, vigencia, folio_expediente, descripcion) values (?, ?, ?, ?, ?)",
+                      [
+                        element.nombre,
+                        element.placa,
+                        element.vigencia,
+                        element.folio_expediente,
+                        element.descripcion
+                      ],
+                      (tx, results) => {
+                        // console.log("Insert placa 1: " + results.rowsAffected);
+                      }
+                    );
+                  });
+                } else if (element.nuevo == 2) {
+                  db.transaction(tx => {
+                    tx.executeSql(
+                      "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?)",
+                      [
+                        element.nombre,
+                        element.placa,
+                        element.vigencia,
+                        element.folio_expediente,
+                        element.descripcion,
+                        element.placa
+                      ],
+                      (tx, results) => {}
+                    );
+                  });
+                }
 
-              db.transaction(tx => {
-                tx.executeSql(
-                  "INSERT INTO items(nombre, placa, vigencia, folio_expediente, descripcion) values (?, ?, ?, ?, ?)",
-                  [
-                    element.nombre,
-                    element.placa,
-                    element.vigencia,
-                    element.folio_expediente,
-                    element.descripcion
-                  ],
-                  (tx, results) => {
-                    console.log("Insert placa 1: " + results.rowsAffected);
-                  }
-                );
+                now = element.fecha_registro;
               });
-            } else if (element.nuevo == 2) {
-              db.transaction(tx => {
-                tx.executeSql(
-                  "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?)",
-                  [
-                    element.nombre,
-                    element.placa,
-                    element.vigencia,
-                    element.folio_expediente,
-                    element.descripcion,
-                    element.placa
-                  ],
-                  (tx, results) => { }
-                );
-              });
+
+              //Quitamos la alerta
+              setAlerta(false);
+              await AsyncStorage.setItem("fecha", now);
+              ToastAndroid.show(
+                "Datos sincronizados correctamente",
+                ToastAndroid.SHORT
+              );
+            } else {
+              setAlerta(false);
+              /*
+              ToastAndroid.show(
+                "Sin datos para sincronizar",
+                ToastAndroid.SHORT
+              );
+              */
             }
-
-            now = element.fecha_registro;
           });
-
-          //Quitamos la alerta
-          setAlerta(false);
-          AsyncStorage.setItem("fecha", now);
-          ToastAndroid.show(
-            "Datos sincronizados correctamente",
-            ToastAndroid.SHORT
-          );
-        } else {
-          setAlerta(false);
-          ToastAndroid.show("Sin datos para sincronizar", ToastAndroid.SHORT);
-        }
       } catch (error) {
         console.error(error);
         setAlerta(false);
@@ -164,18 +179,18 @@ const Home = ({ navigation }) => {
   const get_data = async () => {
     update();
 
-
     db.transaction(tx => {
       tx.executeSql(
         "select * from items where placa = ?",
-        [text],
+        [text.trim()],
         (tx, results) => {
           if (results.rows._array.length > 0) {
+            setText(""); //Limpiamos el input
+
             var datos = {
               nombre: results.rows.item(0).nombre,
               vigencia: results.rows.item(0).vigencia,
               folio: results.rows.item(0).folio_expediente,
-              estatus: results.rows.item(0).estatus,
               placa: results.rows.item(0).placa,
               descripcion: results.rows.item(0).descripcion
             };
@@ -192,7 +207,6 @@ const Home = ({ navigation }) => {
         }
       );
     });
-
   };
 
   return (
@@ -208,6 +222,7 @@ const Home = ({ navigation }) => {
           <TextInput
             autoCapitalize={"characters"}
             style={styles.input}
+            value={text}
             onChangeText={text => setText(text)}
             placeholder="Placa"
           />
@@ -221,25 +236,25 @@ const Home = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       ) : (
-          <View style={styles.updatedContainer}>
-            <Image
-              source={require("./assets/codigo.png")}
-              style={{ width: 200, height: 200 }}
-            />
-            <Text style={{ textAlign: "center", marginTop: 30 }}>
-              {" "}
+        <View style={styles.updatedContainer}>
+          <Image
+            source={require("./assets/codigo.png")}
+            style={{ width: 200, height: 200 }}
+          />
+          <Text style={{ textAlign: "center", marginTop: 30 }}>
+            {" "}
             Antes de continuar, es importante {"\n"} descargar la base{" "}
-            </Text>
-            <Button
-              onPress={update}
-              title="Descargar base"
-              loading={alerta ? true : null}
-              disabled={alerta ? true : null}
-              containerStyle={{ marginTop: 20 }}
-              buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
-            />
-          </View>
-        )}
+          </Text>
+          <Button
+            onPress={update}
+            title="Descargar base"
+            loading={alerta ? true : null}
+            disabled={alerta ? true : null}
+            containerStyle={{ marginTop: 20 }}
+            buttonStyle={{ backgroundColor: "#000000", padding: 15 }}
+          />
+        </View>
+      )}
       {text.length > 0 ? (
         <View style={{ width: "67%" }}>
           <TouchableOpacity onPress={get_data} style={styles.lgBtn}>
@@ -258,9 +273,137 @@ const Home = ({ navigation }) => {
 };
 
 const Camera = () => {
-
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(true);
+  const [conected, setConected] = useState(false);
+
+  useEffect(() => {
+    const conexion = async () => {
+      const conexion = await Network.getNetworkStateAsync();
+      if (conexion.isInternetReachable && conexion.isConnected) {
+        setConected(true);
+      } else {
+        setConected(false);
+      }
+    };
+
+    conexion();
+  });
+
+  const update = async () => {
+    if (conected) {
+      try {
+        if ((await AsyncStorage.getItem("fecha")) == null) {
+          /**
+           * Si por alguna razon se borra la variable fecha, restablecemos todo los
+           * datos
+           */
+
+          db.transaction(tx => {
+            tx.executeSql("drop table items", [], (tx, results) => {
+              //Alert.alert("table delected");
+            });
+          });
+
+          db.transaction(tx => {
+            tx.executeSql(
+              "CREATE TABLE IF NOT EXISTS items(nombre TEXT, placa TEXT, vigencia TEXT, folio_expediente TEXT, descripcion TEXT)",
+              null,
+              (tx, results) => {
+                //Alert.alert("table created");
+              }
+            );
+          });
+        }
+
+        //Obtenemos la información
+        await axios({
+          method: "post",
+          url: "https://7819c4cbb689.ngrok.io/api/acreditaciones/get_all",
+          data: {
+            fecha:
+              (await AsyncStorage.getItem("fecha")) == null
+                ? ""
+                : await AsyncStorage.getItem("fecha")
+          },
+          headers: {
+            "Cache-Control": "no-cache",
+            "Cache-Control": "no-transform",
+            "Cache-Control": "no-store"
+          }
+        })
+          .catch(function(error) {
+            ToastAndroid.show(
+              "Ocurrió un problema al obtener los datos",
+              ToastAndroid.SHORT
+            );
+            return;
+          })
+          .then(async function(response) {
+            let now = "";
+
+            if (Object.keys(response.data).length > 0) {
+              ToastAndroid.show("Actualizando datos", ToastAndroid.SHORT);
+
+              //Recorremos el json
+              response.data.forEach(element => {
+                if (element.nuevo == 1) {
+                  db.transaction(tx => {
+                    tx.executeSql(
+                      "INSERT INTO items(nombre, placa, vigencia, folio_expediente, descripcion) values (?, ?, ?, ?, ?)",
+                      [
+                        element.nombre,
+                        element.placa,
+                        element.vigencia,
+                        element.folio_expediente,
+                        element.descripcion
+                      ],
+                      (tx, results) => {
+                        // console.log("Insert placa 1: " + results.rowsAffected);
+                      }
+                    );
+                  });
+                } else if (element.nuevo == 2) {
+                  db.transaction(tx => {
+                    tx.executeSql(
+                      "UPDATE items set nombre = ?, placa = ?, vigencia = ?, folio_expediente = ?, descripcion = ? where placa = ?) values (?, ?, ?, ?, ?, ?)",
+                      [
+                        element.nombre,
+                        element.placa,
+                        element.vigencia,
+                        element.folio_expediente,
+                        element.descripcion,
+                        element.placa
+                      ],
+                      (tx, results) => {}
+                    );
+                  });
+                }
+
+                now = element.fecha_registro;
+              });
+
+              await AsyncStorage.setItem("fecha", now);
+              ToastAndroid.show(
+                "Datos sincronizados correctamente",
+                ToastAndroid.SHORT
+              );
+            } else {
+              /*
+              ToastAndroid.show(
+                "Sin datos para sincronizar",
+                ToastAndroid.SHORT
+              );
+              */
+            }
+          });
+      } catch (error) {
+        console.error(error);
+      }
+    } else {
+      ToastAndroid.show("Sin conexión a internet", ToastAndroid.SHORT);
+    }
+  };
 
   const navigation = useNavigation();
 
@@ -273,7 +416,7 @@ const Camera = () => {
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(false);
-
+    update();
     db.transaction(tx => {
       tx.executeSql(
         "select * from items where placa = ?",
@@ -284,7 +427,6 @@ const Camera = () => {
               nombre: results.rows.item(0).nombre,
               vigencia: results.rows.item(0).vigencia,
               folio: results.rows.item(0).folio_expediente,
-              estatus: results.rows.item(0).estatus,
               placa: results.rows.item(0).placa,
               descripcion: results.rows.item(0).descripcion
             };
@@ -306,7 +448,7 @@ const Camera = () => {
 
   if (hasPermission === null) {
     return (
-      <View>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <Text> Necesita dar permisos para continuar </Text>
       </View>
     );
@@ -314,7 +456,7 @@ const Camera = () => {
 
   if (hasPermission === false) {
     return (
-      <View>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <Text> Necesita dar permisos para continuar </Text>
       </View>
     );
@@ -335,65 +477,68 @@ const Camera = () => {
 };
 
 const Detail = ({ route }) => {
-  const {
-    nombre,
-    vigencia,
-    folio,
-    estatus,
-    placa,
-    descripcion
-  } = route.params.data;
+  const { nombre, vigencia, folio, placa, descripcion } = route.params.data;
 
   console.log(route.params);
 
   return (
-    <View style={styles.detailContainer}>
-      <View style={styles.placa}>
-        <View style={styles.negro}>
-          <View style={styles.blanco}>
-            <View style={styles.cuadrolLeftTop}></View>
-            <View style={styles.cuadrolRightTop}></View>
-            <View style={styles.cuadrolRightBottom}></View>
-            <View style={styles.cuadrolLeftBottom}></View>
-            <Text style={styles.txtplaca}>{placa}</Text>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView>
+        <View style={styles.detailContainer}>
+          <View style={styles.placa}>
+            <View style={styles.negro}>
+              <View style={styles.blanco}>
+                <View style={styles.cuadrolLeftTop}></View>
+                <View style={styles.cuadrolRightTop}></View>
+                <View style={styles.cuadrolRightBottom}></View>
+                <View style={styles.cuadrolLeftBottom}></View>
+                <Text style={styles.txtplaca}>{placa}</Text>
+              </View>
+            </View>
+          </View>
+          <View style={{ width: "80%", marginTop: 20 }}>
+            <Text style={{ fontSize: 20, textAlign: "center" }}>{nombre}</Text>
+          </View>
+          <View style={{ width: "80%", marginTop: 10 }}>
+            <Badge
+              value={
+                moment(new Date()).format("YYYY-MM-DD") >
+                moment(vigencia).format("YYYY-MM-DD")
+                  ? "No vigente"
+                  : "Vigente"
+              }
+              status={
+                moment(new Date()).format("YYYY-MM-DD") >
+                moment(vigencia).format("YYYY-MM-DD")
+                  ? "warning"
+                  : "success"
+              }
+            />
+          </View>
+          <View style={{ marginTop: 30 }}></View>
+          <View style={{ width: "90%" }}>
+            <View style={styles.carta}>
+              <Icon name="folder" type="font-awesome" />
+              <Text style={{ marginLeft: 10 }}>Folio: {folio}</Text>
+            </View>
+          </View>
+          <View style={{ width: "90%", marginTop: 15 }}>
+            <View style={styles.carta}>
+              <Icon name="address-card" type="font-awesome" />
+              <Text style={{ marginLeft: 10 }}>{descripcion}</Text>
+            </View>
+          </View>
+          <View style={{ width: "90%", marginTop: 15 }}>
+            <View style={styles.carta}>
+              <Icon name="hourglass-end" type="font-awesome" />
+              <Text style={{ marginLeft: 10 }}>
+                Vigencia: {moment(vigencia).format("LL")}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-      <View style={{ width: '80%', marginTop: 20 }}>
-        <Text style={{ fontSize: 20, textAlign: 'center' }}>{nombre}</Text>
-      </View>
-      <View style={{ width: '80%', marginTop: 10 }}>
-        <Badge value={estatus} status="success" />
-      </View>
-      <View style={{ marginTop: 30 }}></View>
-      <View style={{ width: '90%' }}>
-        <View style={styles.carta}>
-          <Icon
-            name='folder'
-            type='font-awesome'
-          />
-          <Text style={{ marginLeft: 10 }}>Folio: {folio}</Text>
-        </View>
-      </View>
-      <View style={{ width: '90%', marginTop: 15 }}>
-        <View style={styles.carta}>
-          <Icon
-            name='address-card'
-            type='font-awesome'
-          />
-          <Text style={{ marginLeft: 10 }}>{descripcion}</Text>
-        </View>
-      </View>
-      <View style={{ width: '90%', marginTop: 15 }}>
-        <View style={styles.carta}>
-          <Icon
-            name='hourglass-end'
-            type='font-awesome'
-          />
-          <Text style={{ marginLeft: 10 }}>Vigencia: {vigencia}</Text>
-        </View>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -462,77 +607,77 @@ const styles = StyleSheet.create({
   detailContainer: {
     flex: 1,
     padding: 30,
-    flexDirection: 'column',
-    alignItems: 'center'
+    flexDirection: "column",
+    alignItems: "center"
   },
   placa: {
-    width: '80%',
+    width: "80%",
     height: 150,
-    backgroundColor: '#f6c065',
+    backgroundColor: "#f6c065",
     marginTop: 30,
     padding: 15,
     borderRadius: 5
   },
   negro: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000000',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000000",
     padding: 15
   },
   blanco: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center'
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center"
   },
   cuadrolLeftTop: {
     width: 10,
     height: 10,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     margin: 10,
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 0
   },
   cuadrolRightTop: {
     width: 10,
     height: 10,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     margin: 10,
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: 0
   },
   cuadrolRightBottom: {
     width: 10,
     height: 10,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     margin: 10,
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     bottom: 0
   },
   cuadrolLeftBottom: {
     width: 10,
     height: 10,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     margin: 10,
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     bottom: 0
   },
   txtplaca: {
     fontSize: 25,
-    fontWeight: 'bold'
+    fontWeight: "bold"
   },
   carta: {
-    width: '100%',
+    width: "100%",
     padding: 15,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    borderColor: '#e8e8e8',
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    borderColor: "#e8e8e8",
     borderWidth: 1
   }
 });
